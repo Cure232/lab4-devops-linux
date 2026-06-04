@@ -1,0 +1,7 @@
+ansible/inventory.ini
+*.key
+*.pem
+id_*
+*.log
+__pycache__/
+.DS_Store

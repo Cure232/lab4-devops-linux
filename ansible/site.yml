@@ -1,0 +1,98 @@
+---
+- name: Deploy Lab4 HTTP service
+  hosts: lab4
+  become: true
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - git
+          - curl
+          - python3
+          - python3-venv
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create service directory
+      file:
+        path: /opt/lab4-service
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create html directory
+      file:
+        path: /opt/lab4-service/html
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Deploy index.html
+      copy:
+        src: ../html/index.html
+        dest: /opt/lab4-service/html/index.html
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart lab4-service
+
+    - name: Deploy service.sh
+      copy:
+        src: ../scripts/service.sh
+        dest: /opt/lab4-service/service.sh
+        owner: root
+        group: root
+        mode: '0755'
+      notify: Restart lab4-service
+
+    - name: Deploy healthcheck script
+      copy:
+        src: ../scripts/lab4-healthcheck.sh
+        dest: /usr/local/bin/lab4-healthcheck.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Deploy systemd unit
+      copy:
+        src: ../systemd/lab4-service.service
+        dest: /etc/systemd/system/lab4-service.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - Reload systemd
+        - Restart lab4-service
+
+    - name: Flush handlers before service start
+      meta: flush_handlers
+
+    - name: Enable and start lab4-service
+      systemd:
+        name: lab4-service
+        enabled: true
+        state: started
+    - name: Check HTTP service with Ansible uri module
+      uri:
+        url: http://127.0.0.1:8000/
+        status_code: 200
+        return_content: true
+      register: lab4_http_check
+
+    - name: Show healthcheck result
+      debug:
+        msg: "HTTP check passed with status {{ lab4_http_check.status }}"
+
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: true
+
+    - name: Restart lab4-service
+      systemd:
+        name: lab4-service
+        state: restarted
